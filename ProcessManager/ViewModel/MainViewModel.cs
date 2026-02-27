@@ -79,9 +79,12 @@ namespace ProcessManager.ViewModels
             get => _updateInterval;
             set
             {
-                _updateInterval = Math.Max(1, Math.Min(10, value));
-                OnPropertyChanged(nameof(UpdateInterval));
-                UpdateTimerInterval();
+                if (int.TryParse(value.ToString(), out int newValue) && newValue > 0)
+                {
+                    _updateInterval = newValue;
+                    OnPropertyChanged(nameof(UpdateInterval));
+                    UpdateTimerInterval();
+                }
             }
         }
 
@@ -145,7 +148,7 @@ namespace ProcessManager.ViewModels
 
         public MainViewModel()
         {
-            // Инициализация Cores ДО всего остального
+            // Инициализация Cores
             Cores = new ObservableCollection<bool>();
             for (int i = 0; i < CoreCount; i++)
             {
@@ -168,7 +171,7 @@ namespace ProcessManager.ViewModels
             try
             {
                 _totalCpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
-                _totalCpuCounter.NextValue(); // Первый вызов всегда 0
+                _totalCpuCounter.NextValue();
             }
             catch (Exception ex)
             {
@@ -240,7 +243,7 @@ namespace ProcessManager.ViewModels
                 filtered = filtered.Where(p => p.HasWindow);
 
             if (OnlySystem)
-                filtered = filtered.Where(p => p.Id < 1000);
+                filtered = filtered.Where(p => p.Id < 1000 || p.Id == 0 || p.Id == 4); // Системные процессы
 
             Processes.Clear();
             foreach (var p in filtered.OrderByDescending(p => p.MemoryUsage))
@@ -256,18 +259,34 @@ namespace ProcessManager.ViewModels
             var dict = list.ToDictionary(p => p.Id);
             var added = new HashSet<int>();
 
-            foreach (var p in list)
+            // Сначала добавляем процессы без родителей или с некорректными родителями
+            foreach (var p in list.Where(p => !dict.ContainsKey(p.ParentId) || p.ParentId == 0))
             {
-                if (dict.ContainsKey(p.ParentId) && !added.Contains(p.ParentId))
-                {
-                    if (!dict[p.ParentId].Children.Contains(p))
-                        dict[p.ParentId].Children.Add(p);
-                }
-                else if (!added.Contains(p.Id))
+                if (!added.Contains(p.Id))
                 {
                     ProcessTree.Add(p);
                     added.Add(p.Id);
+                    AddChildrenRecursive(p, dict, added);
                 }
+            }
+
+            // Добавляем оставшиеся процессы как корневые
+            foreach (var p in list.Where(p => !added.Contains(p.Id)))
+            {
+                ProcessTree.Add(p);
+                added.Add(p.Id);
+                AddChildrenRecursive(p, dict, added);
+            }
+        }
+
+        private void AddChildrenRecursive(ProcessInfo parent, Dictionary<int, ProcessInfo> dict, HashSet<int> added)
+        {
+            var children = dict.Values.Where(p => p.ParentId == parent.Id && !added.Contains(p.Id));
+            foreach (var child in children)
+            {
+                parent.Children.Add(child);
+                added.Add(child.Id);
+                AddChildrenRecursive(child, dict, added);
             }
         }
 
@@ -394,7 +413,7 @@ namespace ProcessManager.ViewModels
                 if (_service.SetAffinity(SelectedProcess.Id, mask))
                 {
                     StatusMessage = $"Привязка к ядрам для {SelectedProcess.Name} применена";
-                    LoadAffinity(); // Обновляем отображение
+                    LoadAffinity();
                 }
                 else
                 {
@@ -458,7 +477,7 @@ namespace ProcessManager.ViewModels
                     if (values != null)
                     {
                         values.Add(value);
-                        if (values.Count > 30) // Храним последние 30 значений
+                        if (values.Count > 30)
                             values.RemoveAt(0);
                     }
                 }
@@ -467,7 +486,7 @@ namespace ProcessManager.ViewModels
 
         private void UpdateMemoryChart(List<ProcessInfo> list)
         {
-            var top = list.OrderByDescending(p => p.MemoryUsage).Take(8);
+            var top = list.OrderByDescending(p => p.MemoryUsage).Take(10); // Изменено с 8 на 10
 
             MemorySeries.Clear();
             foreach (var p in top)
@@ -497,6 +516,7 @@ namespace ProcessManager.ViewModels
 
 ОСНОВНЫЕ ВОЗМОЖНОСТИ:
 • Просмотр всех запущенных процессов
+• Просмотр дерева процессов (иерархия родитель-дочерние)
 • Завершение процессов (ПКМ → Завершить или Delete)
 • Изменение приоритета (ПКМ → Приоритет)
 • Настройка привязки к ядрам процессора (Affinity)
@@ -531,9 +551,28 @@ namespace ProcessManager.ViewModels
     public class RelayCommand : ICommand
     {
         private readonly Action<object> _execute;
-        public RelayCommand(Action<object> execute) { _execute = execute; }
-        public bool CanExecute(object parameter) { return true; }
-        public void Execute(object parameter) { _execute(parameter); }
-        public event EventHandler CanExecuteChanged;
+        private readonly Func<object, bool> _canExecute;
+
+        public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return _canExecute == null || _canExecute(parameter);
+        }
+
+        public void Execute(object parameter)
+        {
+            _execute(parameter);
+        }
+
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
     }
 }

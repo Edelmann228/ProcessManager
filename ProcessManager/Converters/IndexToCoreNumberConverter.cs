@@ -12,6 +12,13 @@ namespace ProcessManager.Converters
             {
                 return $"Core {index + 1}";
             }
+
+            // Если value - это bool, значит это сам CheckBox, показываем просто "Core"
+            if (value is bool)
+            {
+                return "Core";
+            }
+
             return "Core";
         }
 

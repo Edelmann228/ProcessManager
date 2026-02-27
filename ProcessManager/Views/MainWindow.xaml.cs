@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Input;
+using System.Windows.Controls;
 
 namespace ProcessManager.Views
 {
@@ -9,7 +10,6 @@ namespace ProcessManager.Views
         {
             InitializeComponent();
 
-            // Дополнительная привязка команд
             CommandBindings.Add(new CommandBinding(
                 new RoutedCommand("DeleteCommand", typeof(MainWindow)),
                 (s, e) => ExecuteDelete(),
@@ -34,6 +34,32 @@ namespace ProcessManager.Views
         {
             var vm = DataContext as ViewModels.MainViewModel;
             vm?.KillCommand.Execute(null);
+        }
+
+        private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (e.NewValue is Models.ProcessInfo process)
+            {
+                var vm = DataContext as ViewModels.MainViewModel;
+                if (vm != null)
+                {
+                    vm.SelectedProcess = process;
+                }
+            }
+        }
+
+        private void TreeViewItem_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var treeViewItem = sender as TreeViewItem;
+            if (treeViewItem?.DataContext is Models.ProcessInfo process)
+            {
+                var vm = DataContext as ViewModels.MainViewModel;
+                if (vm != null)
+                {
+                    vm.SelectedProcess = process;
+                    treeViewItem.IsSelected = true;
+                }
+            }
         }
     }
 }
