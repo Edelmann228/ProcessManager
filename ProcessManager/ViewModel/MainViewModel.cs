@@ -73,7 +73,7 @@ namespace ProcessManager.ViewModels
             }
         }
 
-        private int _updateInterval = 2;
+        private int _updateInterval = 5;
         public int UpdateInterval
         {
             get => _updateInterval;
@@ -187,7 +187,7 @@ namespace ProcessManager.ViewModels
             _updateTimer.Tick += async (s, e) => await LoadProcessesAsync();
             _updateTimer.Start();
 
-            // Таймер для обновления CPU (каждую секунду)
+            // Таймер для обновления CPU 
             _cpuTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(1)
@@ -195,7 +195,6 @@ namespace ProcessManager.ViewModels
             _cpuTimer.Tick += (s, e) => UpdateCpuUsage();
             _cpuTimer.Start();
 
-            // Первоначальная загрузка
             Task.Run(async () => await LoadProcessesAsync());
 
             StatusMessage = "Программа запущена";
@@ -259,7 +258,7 @@ namespace ProcessManager.ViewModels
             var dict = list.ToDictionary(p => p.Id);
             var added = new HashSet<int>();
 
-            // Сначала добавляем процессы без родителей или с некорректными родителями
+    
             foreach (var p in list.Where(p => !dict.ContainsKey(p.ParentId) || p.ParentId == 0))
             {
                 if (!added.Contains(p.Id))
@@ -270,7 +269,7 @@ namespace ProcessManager.ViewModels
                 }
             }
 
-            // Добавляем оставшиеся процессы как корневые
+            
             foreach (var p in list.Where(p => !added.Contains(p.Id)))
             {
                 ProcessTree.Add(p);
@@ -486,7 +485,7 @@ namespace ProcessManager.ViewModels
 
         private void UpdateMemoryChart(List<ProcessInfo> list)
         {
-            var top = list.OrderByDescending(p => p.MemoryUsage).Take(10); // Изменено с 8 на 10
+            var top = list.OrderByDescending(p => p.MemoryUsage).Take(10); 
 
             MemorySeries.Clear();
             foreach (var p in top)
