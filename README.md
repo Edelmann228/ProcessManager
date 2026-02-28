@@ -43,8 +43,7 @@
 | **UI-фреймворк**         | WPF (Windows Presentation Foundation)   |
 | **Архитектурный паттерн** | MVVM (Model-View-ViewModel)         |
 | **Графики**  | LiveCharts (WPF)              |
-| **ScottPlot.Avalonia**  | Графики и визуализация                       |
-| **Rider / Visual Studio** | Среда разработки                           |
+
 
 ---
 ## Интерфейс
